@@ -1,3 +1,12 @@
+@font-face {
+  font-family: Adventure;
+  src: url("/Adventure.otf") format("opentype");
+}
+
+body {
+  font-family: Adventure;
+}
+
 .map-container {
   position: fixed;
   top: 0;
@@ -8,4 +17,57 @@
 
 .leaflet-control-attribution {
   visibility: hidden;
+}
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  color: #fcfae6;
+}
+
+.overlay:not(.visible) {
+  display: none;
+}
+
+button {
+  border: 0;
+  background: none;
+  color: #f55d23;
+  padding: 0;
+  outline: none;
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+button svg {
+  font-size: 48pt;
+}
+
+h1 {
+  padding: 12px;
+  font-size: 48pt;
+  background: -webkit-linear-gradient(#fcfae6, #f55d23);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin: 0;
+}
+
+small {
+  font-size: 37pt;
+  line-height: 10pt;
+}
+
+h1, h2, h3 {
+  margin: 0;
 }

@@ -6,7 +6,38 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css" integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ==" crossorigin="" />
   </head>
   <body>
-    <script type="module" src="/app.js"></script>
     <div id="map" class="map-container"></div>
+
+    <div id="ready-overlay" class="overlay">
+      <center>
+        <h1>Dan <small><div>and</div></small> Ffion</h1>
+        <button id="start-button">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="fill: currentColor; width: 1em; height: 1em"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm-3 17v-10l9 5.146-9 4.854z"/></svg>
+        </button>
+      </center>
+    </div>
+
+    <div id="error-overlay" class="overlay">
+      <center>
+        <h1>Something went wrong</h1>
+        <button id="start-button">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="fill: currentColor; width: 1em; height: 1em"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm-3 17v-10l9 5.146-9 4.854z"/></svg>
+          <h1>Retry?</h1>
+        </button>
+      </center>
+    </div>
+
+    <div id="end-overlay" class="overlay">
+      <center>
+        <h3>We're in</h3>
+        <h1 id="current-location"></h1>
+        <button id="restart-button">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="fill: currentColor; width: 1em; height: 1em"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm-3 17v-10l9 5.146-9 4.854z"/></svg>
+          <h3>Restart</h3>
+        </button>
+      </center>
+    </div>
+
+    <script type="module" src="/app.js"></script>
   </body>
 </html>

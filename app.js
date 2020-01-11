@@ -1,143 +1,237 @@
 import * as Leaflet from "https://unpkg.com/leaflet@1.6.0/dist/leaflet-src.esm.js";
 
-let theme = new Audio("/theme.mp3");
+const TILES_API_KEY = "62412d12c2504cd495cd67d7f063bf1f";
 
-let params = new URLSearchParams(window.location.search);
-let steps = params.get("steps");
+/**
+ * @return {App}
+ */
+function createApp() {
+  let params = new URLSearchParams(location.search);
+  let start = params.get("start") || "-3";
+  let stepIndex = parseInt(start);
 
-if (steps === "all") {
-  steps = Infinity;
-} else {
-  steps = parseInt(steps) || 3;
-}
-
-class AnimatedPolyline extends Leaflet.Polyline {
-  constructor(latlngs, options) {
-    options.speed = options.speed || 200;
-    super(latlngs, options);
-  }
-
-  async addAnimatedLatLng({ lat, lng }) {
-    let latLngs = this.getLatLngs();
-    let startLatLng = latLngs[latLngs.length - 1];
-    let endLatLng = Leaflet.latLng(lat, lng);
-    let animatedLatLng = Leaflet.latLng(startLatLng.lat, startLatLng.lng);
-    let offsetLat = endLatLng.lat - startLatLng.lat;
-    let offsetLng = endLatLng.lng - startLatLng.lng;
-
-    // Add the animated lat lng to the line
-    this.addLatLng(animatedLatLng);
-
-    let distance = startLatLng.distanceTo(endLatLng);
-    let elapsed = 0;
-    let duration = distance / this.options.speed;
-
-    while (elapsed < duration) {
-      let delta = await waitForAnimationFrame();
-      elapsed += delta;
-
-      // Move the animated point along the line
-      let percent = Math.min(elapsed / duration, 1);
-      animatedLatLng.lat = startLatLng.lat + (offsetLat * percent);
-      animatedLatLng.lng = startLatLng.lng + (offsetLng * percent);
-
-      this._map.setView(animatedLatLng);
-
-      // Refresh the line now that we've mutated the points
-      this.refresh();
-    }
-
-    animatedLatLng.lat = endLatLng.lat;
-    animatedLatLng.lng = endLatLng.lng;
-    this.refresh();
-  }
-
-  refresh() {
-    let latLngs = this.getLatLngs();
-    this.setLatLngs(latLngs);
-  }
-}
-
-let map = Leaflet.map("map", {
-  zoomControl: false
-});
-
-map.setView([51.505, -0.09], 5);
-
-let tileLayer = Leaflet.tileLayer("https://{s}.tile.thunderforest.com/pioneer/{z}/{x}/{y}.png?apikey=62412d12c2504cd495cd67d7f063bf1f", {
-  apikey: "62412d12c2504cd495cd67d7f063bf1f",
-  maxZoom: 22
-});
-
-tileLayer.addTo(map);
-
-let polyline = new AnimatedPolyline([], {
-  color: "red",
-  weight: 6,
-  opacity: 0.6,
-  lineCap: "butt"
-});
-
-polyline.addTo(map);
-
-fetch("/journey.json")
-  .then(res => res.json())
-  .then(play);
-
-map.on("click", event => {
-  console.log(event.latlng);
-});
-
-window.addEventListener("keydown", () => {
-  theme.play();
-});
-
-async function play(journey) {
-  let firstStep = journey.shift();
-
-  polyline.addLatLng(firstStep);
-
-  let point = Leaflet.circle(firstStep, {
-    radius: 10000,
-    color: "red",
-    fillOpacity: 1,
+  let map = Leaflet.map("map", {
+    zoomControl: false
   });
 
-  point.addTo(map);
+  let tiles = Leaflet.tileLayer(`https://tile.thunderforest.com/pioneer/{z}/{x}/{y}.png?apikey=${TILES_API_KEY}`, {
+    apikey: TILES_API_KEY,
+    maxZoom: 7
+  });
 
-  let presetSteps = journey.slice(0, -steps);
-  let animatedSteps = journey.slice(-steps);
+  let line = Leaflet.polyline([], {
+    color: "red",
+    weight: 6,
+    opacity: 0.6,
+    lineCap: "butt"
+  });
 
-  // Add the initial leg of the journey to the line
+  tiles.addTo(map);
+  line.addTo(map);
+  map.setView([55, 37], 4);
 
-  for (let step of presetSteps) {
-    polyline.addLatLng(step);
+  let music = new Audio("theme.mp3");
 
-    let point = Leaflet.circle(step, {
-      radius: 10000,
-      color: "red",
-      fillOpacity: 1,
-    });
-
-    point.addTo(map);
-  }
-
-  // Animate the final 3 steps (so people don't have to watch it all)
-
-  for (let step of animatedSteps) {
-    await polyline.addAnimatedLatLng(step);
-
-    let point = Leaflet.circle(step, {
-      radius: 10000,
-      color: "red",
-      fillOpacity: 1,
-    });
-
-    point.addTo(map);
+  return {
+    steps: [],
+    stepIndex,
+    map,
+    tiles,
+    line,
+    music,
   }
 }
 
-async function waitForAnimationFrame() {
+function Start() {
+  let app = createApp();
+  return Load(app);
+}
+
+// --- States ---
+
+/**
+ * @param {App} app
+ */
+async function Load(app) {
+  try {
+    let { stepIndex } = app;
+
+    let response = await fetch("journey.json");
+    let steps = await response.json();
+
+    // Remove steps from the future
+    steps = steps.filter(step => {
+      return new Date(step.date) <= new Date();
+    });
+
+    if (stepIndex < 0) {
+      stepIndex = steps.length + stepIndex;
+    }
+
+    if (stepIndex < 1) {
+      stepIndex = 1;
+    }
+
+    return Ready({ ...app, steps, stepIndex });
+  } catch (error) {
+    return LoadError({ ...app, error });
+  }
+}
+
+/**
+ * @param {App} app
+ */
+function LoadError(app) {
+  $("#error-overlay").classList.add("visible");
+
+  function retry(event) {
+    $("#error-overlay").classList.remove("visible");
+    return Load(app);
+  }
+
+  $("#retry-button").addEventListener("click", retry, { once: true });
+}
+
+/**
+ * @param {App} app
+ */
+function Ready(app) {
+  let { steps, stepIndex, map, music } = app;
+
+  $("#ready-overlay").classList.add("visible");
+
+  let step = steps[stepIndex];
+  map.setView(step);
+
+  function start() {
+    $("#ready-overlay").classList.remove("visible");
+
+    music.play();
+
+    music.addEventListener("ended", () => {
+      music.play();
+    });
+
+    return PlayStep(app);
+  }
+
+  $("#start-button").addEventListener("click", start, { once: true });
+}
+
+/**
+ * @param {App} app
+ */
+async function PlayStep(app) {
+  let { steps, stepIndex, map, line } = app;
+
+  let currentStep = steps[stepIndex];
+  let previousStep = steps[stepIndex - 1];
+  let existingSteps = steps.slice(0, stepIndex);
+  let distance = dist(previousStep, currentStep);
+
+  let duration = distance / 200;
+  let elapsed = 0;
+
+  for (let step of existingSteps) {
+    if (step.zoom) {
+      map.setZoom(step.zoom);
+    }
+  }
+
+  while (elapsed < duration) {
+    elapsed += await requestAnimationFrameAsync();
+
+    let percent = clamp(0, elapsed / duration, 1);
+    let lat = lerp(previousStep.lat, currentStep.lat, percent);
+    let lng = lerp(previousStep.lng, currentStep.lng, percent);
+
+    line.setLatLngs([...existingSteps, { lat, lng }]);
+    map.setView([lat, lng]);
+  }
+
+  line.setLatLngs([...existingSteps, currentStep]);
+  map.setView(currentStep, currentStep.zoom);
+
+  await setTimeoutAsync(500);
+
+  return NextStep(app);
+}
+
+/**
+ * @param {App} app
+ */
+function NextStep(app) {
+  let { steps, stepIndex } = app;
+
+  if (stepIndex + 1 >= steps.length) {
+    return Finished(app);
+  }
+
+  return PlayStep({ ...app, stepIndex: stepIndex + 1 });
+}
+
+/**
+ * @param {App} app
+ */
+function Finished(app) {
+  let currentLocation = null;
+
+  for (let step of app.steps) {
+    if (step.label) {
+      currentLocation = step.label;
+    }
+  }
+
+  $("#current-location").textContent = currentLocation;
+  $("#end-overlay").classList.add("visible");
+  $("#restart-button").addEventListener("click", restart, { once: true });
+
+  function restart() {
+    $("#end-overlay").classList.remove("visible");
+    return Restart(app);
+  }
+}
+
+/**
+ * @param {App} app
+ */
+function Restart(app) {
+  return PlayStep({ ...app, stepIndex: 1 });
+}
+
+// --- Utils ---
+
+/**
+ * @param {number} a
+ * @param {number} b
+ * @param {number} t Between 0 and 1
+ */
+function lerp(a, b, t) {
+  let d = b - a;
+  return a + d * t;
+}
+
+/**
+ * @param {number} min
+ * @param {number} value
+ * @param {number} max
+ */
+function clamp(min, value, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+/**
+ * @param {LatLng} a
+ * @param {LatLng} b
+ */
+function dist(a, b) {
+  return Leaflet.latLng(a).distanceTo(Leaflet.latLng(b));
+}
+
+/**
+ * @return {Promise<number>}
+ */
+async function requestAnimationFrameAsync() {
   let startTime = performance.now();
 
   return new Promise(resolve => {
@@ -147,3 +241,21 @@ async function waitForAnimationFrame() {
     })
   });
 }
+
+/**
+ * @param {number} ms
+ */
+async function setTimeoutAsync(ms) {
+  return new Promise(resolve => {
+    setTimeout(resolve, ms);
+  });
+}
+
+/**
+ * @param {string} selector
+ */
+function $(selector) {
+  return document.querySelector(selector);
+}
+
+Start();
